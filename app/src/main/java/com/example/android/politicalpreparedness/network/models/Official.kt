@@ -1,5 +1,8 @@
 package com.example.android.politicalpreparedness.network.models
 
+import com.squareup.moshi.JsonClass
+
+@JsonClass(generateAdapter = true)
 data class Official (
         val name: String,
         val address: List<Address>? = null,

@@ -1,15 +1,28 @@
+@file:Suppress("BlockingMethodInNonBlockingContext")
+
 package com.example.android.politicalpreparedness.repository
 
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import com.example.android.politicalpreparedness.database.ElectionDatabase
 import com.example.android.politicalpreparedness.network.CivicsApi
-import com.example.android.politicalpreparedness.network.models.*
+import com.example.android.politicalpreparedness.network.jsonadapter.DateAdapter
+import com.example.android.politicalpreparedness.network.jsonadapter.ElectionAdapter
+import com.example.android.politicalpreparedness.network.models.Address
+import com.example.android.politicalpreparedness.network.models.Election
+import com.example.android.politicalpreparedness.network.models.VoterInfoResponse
 import com.example.android.politicalpreparedness.representative.model.Representative
+import com.squareup.moshi.JsonAdapter
+import com.squareup.moshi.Moshi
+import com.squareup.moshi.Types
+import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import timber.log.Timber
+import java.io.BufferedReader
+import java.io.BufferedWriter
+import java.io.File
 
 /**
  * The repository for Election
@@ -20,6 +33,11 @@ class ElectionsRepository(
     private val saveDb: ElectionDatabase,
     private val ioDispatcher: CoroutineDispatcher = Dispatchers.IO
 ) {
+    companion object {
+        private const val FILE_NAME_PREFIX = "backup_representatives"
+        private const val FILE_NAME_SUFFIX = ""
+    }
+
     /**
      * Live data for managing upcoming elections
      */
@@ -44,6 +62,83 @@ class ElectionsRepository(
     private val _voterInfo = MutableLiveData<VoterInfoResponse>()
     val voterInfo: LiveData<VoterInfoResponse>
         get() = _voterInfo
+
+    /**
+     * backup list of Representative
+     */
+
+    suspend fun backupRepresentatives(currentFile: String): String {
+        // delete previous file because it's no longer used
+        deleteBackupFile(currentFile)
+        val moshi = Moshi.Builder().add(ElectionAdapter()).add(KotlinJsonAdapterFactory())
+            .add(DateAdapter()).build()
+        val type = Types.newParameterizedType(List::class.java, Representative::class.java)
+        val jsonAdapter: JsonAdapter<List<Representative>> = moshi.adapter(type)
+        val tempFile = File.createTempFile(FILE_NAME_PREFIX, FILE_NAME_SUFFIX)
+        withContext(ioDispatcher) {
+            val jsonObject = jsonAdapter.toJson(_representatives.value)
+            try {
+                val writeBuffer = BufferedWriter(tempFile.writer())
+                writeBuffer.write(jsonObject.toString())
+                writeBuffer.close()
+            } catch (e: Exception) {
+                Timber.e("write temp file error: ${e.localizedMessage}")
+            }
+        }
+        return tempFile.absolutePath
+    }
+
+    /**
+     * delete old file
+     */
+    suspend fun deleteBackupFile(fileName: String) {
+        withContext(ioDispatcher) {
+            val file = File(fileName)
+            if (!file.exists()) {
+                Timber.d("Try to delete but file not exist $fileName")
+                return@withContext
+            }
+            file.delete()
+        }
+    }
+
+    /**
+     * restore from saved state
+     */
+    suspend fun restoreFromSavedState(fileName: String) {
+        val file = File(fileName)
+        if (!file.exists()) {
+            Timber.d("file not exist $fileName")
+            return
+        }
+        val moshi = Moshi.Builder().add(ElectionAdapter()).add(KotlinJsonAdapterFactory())
+            .add(DateAdapter()).build()
+        val type = Types.newParameterizedType(List::class.java, Representative::class.java)
+        val jsonAdapter: JsonAdapter<List<Representative>> = moshi.adapter(type)
+        var savedPresentatives: List<Representative> = listOf()
+        withContext(ioDispatcher) {
+            var json = ""
+            try {
+                val reader = BufferedReader(file.reader())
+                val stringBuilder = StringBuilder()
+                var line = reader.readLine()
+                while (line != null) {
+                    stringBuilder.append(line).append("\n")
+                    line = reader.readLine()
+                }
+                reader.close()
+                json = stringBuilder.toString()
+            } catch (e: Exception) {
+                Timber.e("read json file error: ${e.localizedMessage}")
+            }
+            savedPresentatives = jsonAdapter.fromJson(json) as List<Representative>
+        }
+        // update UI
+        withContext(Dispatchers.Main) {
+            _representatives.postValue(savedPresentatives)
+        }
+
+    }
 
     /**
      * get upcoming election from Google Civic Api

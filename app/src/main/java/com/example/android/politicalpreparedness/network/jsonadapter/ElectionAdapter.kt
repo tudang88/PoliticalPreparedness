@@ -9,18 +9,17 @@ import com.squareup.moshi.ToJson
  */
 class ElectionAdapter {
     @FromJson
-    fun divisionFromJson (ocdDivisionId: String): Division {
+    fun divisionFromJson(ocdDivisionId: String): Division {
         val countryDelimiter = "country:"
-        val stateDelimiter = "state:"
-        val country = ocdDivisionId.substringAfter(countryDelimiter,"")
-                .substringBefore("/")
-        val state = ocdDivisionId.substringAfter(stateDelimiter,"")
-                .substringBefore("/")
+        val stateDelimiterPattern = Regex("(state:|district:)")
+        val country = ocdDivisionId.substringAfter(countryDelimiter, "")
+            .substringBefore("/")
+        val state = ocdDivisionId.split(stateDelimiterPattern).last().substringBefore("/")
         return Division(ocdDivisionId, country, state)
     }
 
     @ToJson
-    fun divisionToJson (division: Division): String {
+    fun divisionToJson(division: Division): String {
         return division.id
     }
 }

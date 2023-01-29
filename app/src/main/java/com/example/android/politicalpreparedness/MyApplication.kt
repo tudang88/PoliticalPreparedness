@@ -1,6 +1,7 @@
 package com.example.android.politicalpreparedness
 
 import android.app.Application
+import androidx.lifecycle.SavedStateHandle
 import com.example.android.politicalpreparedness.database.ElectionDatabase
 import com.example.android.politicalpreparedness.election.ElectionsViewModel
 import com.example.android.politicalpreparedness.election.VoterInfoViewModel
@@ -25,8 +26,8 @@ class MyApplication : Application() {
             viewModel {
                 VoterInfoViewModel(get())
             }
-            viewModel {
-                RepresentativeViewModel(get())
+            viewModel { (handle:SavedStateHandle) ->
+                RepresentativeViewModel(handle, get())
             }
             // repository instance
             single { ElectionsRepository(get()) }

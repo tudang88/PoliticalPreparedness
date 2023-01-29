@@ -17,7 +17,7 @@ import com.example.android.politicalpreparedness.R
 import com.example.android.politicalpreparedness.databinding.FragmentRepresentativeBinding
 import com.example.android.politicalpreparedness.network.models.Address
 import com.example.android.politicalpreparedness.representative.adapter.RepresentativeListAdapter
-import org.koin.androidx.viewmodel.ext.android.viewModel
+import org.koin.androidx.viewmodel.ext.android.sharedViewModel
 import timber.log.Timber
 import java.util.Locale
 
@@ -26,9 +26,11 @@ class RepresentativeFragment : Fragment() {
 
     companion object {
         private const val REQUEST_LOCAL_PERMISSION = 1
+        private const val KEY_MOTION_LAYOUT_STATE = "key_motion_layout"
+        private const val KEY_SAVED_ADDRESS = "key_address"
     }
 
-    private val _viewModel: RepresentativeViewModel by viewModel()
+    private val _viewModel: RepresentativeViewModel by sharedViewModel()
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -45,7 +47,7 @@ class RepresentativeFragment : Fragment() {
         binding.buttonLocation.setOnClickListener {
             if (checkLocationPermissions()) {
                 getLocation()?.let { location ->
-                    _viewModel.onMyLocationClick(geoCodeLocation(location))
+                    _viewModel.setCurrentAddress(geoCodeLocation(location))
                 }
                 Timber.d("My Location: ${getLocation()}")
             }
@@ -54,6 +56,35 @@ class RepresentativeFragment : Fragment() {
         }
 
         return binding.root
+    }
+
+    /**
+     * restored savedInstanceState
+     */
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        if (savedInstanceState != null) {
+            Timber.d("restore saveInstanceState")
+            val address = savedInstanceState.getSerializable(KEY_SAVED_ADDRESS) as Address
+            val recyclerViewState = savedInstanceState.getInt(KEY_MOTION_LAYOUT_STATE)
+            binding.representativeMotionLayout.transitionToState(recyclerViewState)
+            _viewModel.setCurrentAddress(address)
+        } else {
+            Timber.d("saveInstanceState is null")
+        }
+    }
+
+    /**
+     * save instanceState for restoring later
+     */
+    override fun onSaveInstanceState(outState: Bundle) {
+        Timber.d("saveInstanceState")
+        super.onSaveInstanceState(outState)
+        /**
+         * save state variable to bundle
+         */
+        outState.putInt(KEY_MOTION_LAYOUT_STATE, binding.representativeMotionLayout.currentState)
+        outState.putSerializable(KEY_SAVED_ADDRESS, _viewModel.getCurrentAddress())
     }
 
     /**
