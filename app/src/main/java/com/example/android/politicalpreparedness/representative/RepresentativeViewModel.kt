@@ -3,12 +3,10 @@ package com.example.android.politicalpreparedness.representative
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.SavedStateHandle
-import androidx.lifecycle.Transformations
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.android.politicalpreparedness.network.models.Address
 import com.example.android.politicalpreparedness.repository.ElectionsRepository
-import com.example.android.politicalpreparedness.representative.model.Representative
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
@@ -48,11 +46,12 @@ class RepresentativeViewModel(
      * input state
      */
     fun getCurrentAddress(): Address {
+        val statePosition = selectedStatePos.value ?: 0
         return Address(
             addressLine1.value!!,
             addressLine2.value!!,
             city.value!!,
-            allStateList[selectedStatePos.value!!],
+            allStateList[statePosition],
             zipCode.value!!
         )
     }
@@ -70,7 +69,10 @@ class RepresentativeViewModel(
             city.value = address.city
             zipCode.value = address.zip
             if (allStateList.contains(address.state)) {
-                selectedStatePos.postValue(allStateList.indexOf(address.state))
+                val position = allStateList.indexOf(address.state)
+                if (position != selectedStatePos.value) {
+                    selectedStatePos.postValue(position)
+                }
             }
         }
     }
@@ -90,28 +92,10 @@ class RepresentativeViewModel(
                 )
             )
             // backup data
-//            if (!backupFileName.value.isNullOrEmpty()) {
-//                repository.deleteBackupFile(backupFileName.value!!)
-//            }
             val oldBackupFile = backupFileName.value ?: ""
             savedStateHandle["backupFileName"] = repository.backupRepresentatives(oldBackupFile)
         }
 
-    }
-
-    /**
-     * get address when user
-     * click on Use My Location
-     */
-    fun onMyLocationClick(address: Address) {
-        Timber.d("Found address: $address")
-        viewModelScope.launch {
-            addressLine1.value = address.line1
-            addressLine2.value = address.line2 ?: ""
-            city.value = address.city
-            zipCode.value = address.zip
-            selectedStatePos.value = allStateList.indexOf(address.state)
-        }
     }
 
     /**

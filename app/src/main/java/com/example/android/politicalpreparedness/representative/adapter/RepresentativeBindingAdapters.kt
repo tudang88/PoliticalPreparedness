@@ -15,18 +15,17 @@ import com.example.android.politicalpreparedness.representative.model.Representa
 
 @BindingAdapter("profileImage")
 fun fetchImage(view: ImageView, imgUrl: String?) {
-    imgUrl?.let {
+    if (imgUrl.isNullOrEmpty()) {
+        // show default icon in case imgUrl empty or null
+        view.setImageResource(R.drawable.ic_profile)
+    } else {
         val uri = imgUrl.toUri().buildUpon().scheme("https").build()
         Glide.with(view.context)
             .load(uri)
             .apply(
-                RequestOptions().placeholder(R.drawable.ic_profile)
+                RequestOptions().placeholder(R.drawable.loading_animation)
                     .error(R.drawable.ic_profile)
             ).into(view)
-    }
-    // show default icon in case imgUrl empty or null
-    if (imgUrl == "" || imgUrl == null) {
-        view.setImageResource(R.drawable.ic_profile)
     }
 }
 
